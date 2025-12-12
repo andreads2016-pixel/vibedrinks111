@@ -1,0 +1,504 @@
+import { useState, useMemo } from 'react';
+import { useLocation } from 'wouter';
+import { Phone, User, MapPin, ArrowRight, Loader2, Lock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/auth';
+import { apiRequest } from '@/lib/queryClient';
+import logoImage from '@assets/VIBE_DRINKS_1765072715257.png';
+import { NEIGHBORHOODS, DELIVERY_ZONES, DELIVERY_FEE_WARNING, type DeliveryZone as DeliveryZoneType } from '@shared/delivery-zones';
+
+type Step = 'phone' | 'password' | 'register';
+
+export default function Login() {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const { login, setAddress } = useAuth();
+  
+  const [step, setStep] = useState<Step>('phone');
+  const [isLoading, setIsLoading] = useState(false);
+  const [userName, setUserName] = useState('');
+  
+  const [whatsapp, setWhatsapp] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [street, setStreet] = useState('');
+  const [number, setNumber] = useState('');
+  const [complement, setComplement] = useState('');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const groupedNeighborhoods = useMemo(() => {
+    const zones: DeliveryZoneType[] = ['S', 'A', 'B', 'C', 'D'];
+    return zones.map(zone => ({
+      zone,
+      zoneInfo: DELIVERY_ZONES[zone],
+      neighborhoods: NEIGHBORHOODS.filter(n => n.zone === zone)
+    }));
+  }, []);
+
+  const selectedNeighborhoodFee = useMemo(() => {
+    const found = NEIGHBORHOODS.find(n => n.name === selectedNeighborhood);
+    if (found) {
+      return DELIVERY_ZONES[found.zone].fee;
+    }
+    return null;
+  }, [selectedNeighborhood]);
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 3) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 3)} ${numbers.slice(3)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 3)} ${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setWhatsapp(formatPhone(e.target.value));
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setPassword(value);
+  };
+
+  const handleCheckPhone = async () => {
+    const cleanPhone = whatsapp.replace(/\D/g, '');
+    if (cleanPhone.length !== 11) {
+      toast({ title: 'Numero invalido', description: 'Digite DDD + 9 + numero (11 digitos)', variant: 'destructive' });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await apiRequest('POST', '/api/auth/check-phone', { whatsapp: cleanPhone });
+      const data = await response.json();
+      
+      if (data.isMotoboy) {
+        toast({ 
+          title: 'Acesso de motoboy', 
+          description: 'Use o login de funcionarios para acessar', 
+          variant: 'destructive' 
+        });
+        setTimeout(() => setLocation('/admin-login'), 2000);
+        return;
+      }
+      
+      if (data.exists) {
+        setUserName(data.userName);
+        setStep('password');
+      } else {
+        setStep('register');
+      }
+    } catch (error) {
+      setStep('register');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (password.length !== 6) {
+      toast({ title: 'Senha invalida', description: 'A senha deve ter 6 digitos', variant: 'destructive' });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const cleanPhone = whatsapp.replace(/\D/g, '');
+      const response = await apiRequest('POST', '/api/auth/customer-login', { 
+        whatsapp: cleanPhone, 
+        password 
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        login(data.user, 'customer');
+        if (data.address) {
+          setAddress(data.address);
+        }
+        toast({ title: 'Bem-vindo de volta!', description: `Ola, ${data.user.name}!` });
+        
+        const params = new URLSearchParams(window.location.search);
+        const redirect = params.get('redirect') || '/';
+        setLocation(redirect);
+      } else {
+        toast({ title: 'Erro', description: data.error || 'Senha incorreta', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      let errorMsg = 'Verifique sua senha e tente novamente';
+      if (error instanceof Response) {
+        try {
+          const errorData = await error.json();
+          if (errorData?.error) errorMsg = errorData.error;
+        } catch {}
+      }
+      toast({ 
+        title: 'Erro ao entrar', 
+        description: errorMsg, 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!name.trim()) {
+      toast({ title: 'Nome obrigatorio', variant: 'destructive' });
+      return;
+    }
+    if (password.length !== 6) {
+      toast({ title: 'Senha invalida', description: 'A senha deve ter 6 digitos', variant: 'destructive' });
+      return;
+    }
+    if (!selectedNeighborhood) {
+      toast({ title: 'Bairro obrigatorio', description: 'Selecione seu bairro', variant: 'destructive' });
+      return;
+    }
+    if (!street || !number) {
+      toast({ title: 'Endereco incompleto', description: 'Preencha rua e numero', variant: 'destructive' });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const cleanPhone = whatsapp.replace(/\D/g, '');
+      const response = await apiRequest('POST', '/api/auth/register', {
+        user: { name, whatsapp: cleanPhone, password },
+        address: { 
+          street, 
+          number, 
+          complement, 
+          neighborhood: selectedNeighborhood, 
+          city: 'Sao Paulo', 
+          state: 'SP', 
+          zipCode: '', 
+          notes 
+        }
+      });
+      const data = await response.json();
+      
+      login(data.user, 'customer');
+      setAddress(data.address);
+      toast({ title: 'Cadastro realizado!', description: `Bem-vindo, ${name}!` });
+      
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect') || '/';
+      setLocation(redirect);
+    } catch (error: any) {
+      let errorMsg = 'Tente novamente';
+      if (error instanceof Response) {
+        try {
+          const errorData = await error.json();
+          if (errorData?.error) errorMsg = errorData.error;
+        } catch {}
+      }
+      toast({ 
+        title: 'Erro ao cadastrar', 
+        description: errorMsg, 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getStepTitle = () => {
+    switch (step) {
+      case 'phone': return 'Entrar';
+      case 'password': return `Ola, ${userName}!`;
+      case 'register': return 'Criar Conta';
+    }
+  };
+
+  const getStepDescription = () => {
+    switch (step) {
+      case 'phone': return 'Digite seu numero de WhatsApp para continuar';
+      case 'password': return 'Digite sua senha de 6 digitos';
+      case 'register': return 'Complete seu cadastro para fazer pedidos';
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(price);
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-card border-primary/20">
+        <CardHeader className="text-center">
+          <img src={logoImage} alt="Vibe Drinks" className="h-16 mx-auto mb-4" />
+          <CardTitle className="font-serif text-2xl text-primary">
+            {getStepTitle()}
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
+            {getStepDescription()}
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          {step === 'phone' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp" className="text-foreground">WhatsApp</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="whatsapp"
+                    type="tel"
+                    placeholder="(11) 9 1234-5678"
+                    value={whatsapp}
+                    onChange={handlePhoneChange}
+                    className="pl-10 bg-secondary border-primary/30 text-foreground"
+                    data-testid="input-whatsapp"
+                  />
+                </div>
+              </div>
+
+              <Button
+                className="w-full bg-primary text-primary-foreground"
+                onClick={handleCheckPhone}
+                disabled={isLoading}
+                data-testid="button-continue"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <>
+                    Continuar
+                    <ArrowRight className="h-5 w-5 ml-2" />
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground"
+                onClick={() => setLocation('/')}
+                data-testid="button-back-home"
+              >
+                Voltar para o site
+              </Button>
+            </>
+          )}
+
+          {step === 'password' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-foreground">Senha (6 digitos)</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    inputMode="numeric"
+                    placeholder="000000"
+                    value={password}
+                    onChange={handlePasswordChange}
+                    maxLength={6}
+                    className="pl-10 bg-secondary border-primary/30 text-foreground text-center text-xl tracking-widest"
+                    data-testid="input-password"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-primary/50 text-primary"
+                  onClick={() => {
+                    setStep('phone');
+                    setPassword('');
+                  }}
+                  data-testid="button-back-password"
+                >
+                  Voltar
+                </Button>
+                <Button
+                  className="flex-1 bg-primary text-primary-foreground"
+                  onClick={handleLogin}
+                  disabled={isLoading || password.length !== 6}
+                  data-testid="button-login"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    'Entrar'
+                  )}
+                </Button>
+              </div>
+
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground text-sm"
+                onClick={() => {
+                  toast({ 
+                    title: 'Recuperar Senha', 
+                    description: 'Entre em contato com a loja via WhatsApp para solicitar uma nova senha.'
+                  });
+                }}
+                data-testid="button-forgot-password"
+              >
+                Esqueci minha senha
+              </Button>
+            </>
+          )}
+
+          {step === 'register' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-foreground">Nome completo</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    placeholder="Seu nome"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="pl-10 bg-secondary border-primary/30 text-foreground"
+                    data-testid="input-name"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="register-password" className="text-foreground">Crie uma senha (6 digitos)</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="register-password"
+                    type="password"
+                    inputMode="numeric"
+                    placeholder="000000"
+                    value={password}
+                    onChange={handlePasswordChange}
+                    maxLength={6}
+                    className="pl-10 bg-secondary border-primary/30 text-foreground text-center text-xl tracking-widest"
+                    data-testid="input-register-password"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Apenas numeros, 6 digitos</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-foreground flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Endereco de entrega
+                </Label>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Bairro (Grande Sao Paulo)</Label>
+                  <Select
+                    value={selectedNeighborhood}
+                    onValueChange={setSelectedNeighborhood}
+                  >
+                    <SelectTrigger 
+                      className="bg-secondary border-primary/30"
+                      data-testid="select-neighborhood-register"
+                    >
+                      <SelectValue placeholder="Selecione seu bairro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {groupedNeighborhoods.map(({ zone, zoneInfo, neighborhoods }) => (
+                        <div key={zone}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-secondary/50">
+                            {zoneInfo.name} - {formatPrice(zoneInfo.fee)}
+                          </div>
+                          {neighborhoods.map((n) => (
+                            <SelectItem 
+                              key={n.name} 
+                              value={n.name}
+                              data-testid={`option-neighborhood-${n.name}`}
+                            >
+                              {n.name}
+                            </SelectItem>
+                          ))}
+                        </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedNeighborhoodFee !== null && (
+                    <p className="text-sm text-primary">
+                      Taxa de entrega: {formatPrice(selectedNeighborhoodFee)}
+                    </p>
+                  )}
+                </div>
+                
+                <p className="text-xs text-muted-foreground">{DELIVERY_FEE_WARNING}</p>
+
+                <div className="grid grid-cols-4 gap-2">
+                  <Input
+                    placeholder="Rua"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    className="col-span-3 bg-secondary border-primary/30 text-foreground"
+                    data-testid="input-street"
+                  />
+                  <Input
+                    placeholder="Nro"
+                    value={number}
+                    onChange={(e) => setNumber(e.target.value)}
+                    className="bg-secondary border-primary/30 text-foreground"
+                    data-testid="input-number"
+                  />
+                </div>
+
+                <Input
+                  placeholder="Complemento (opcional)"
+                  value={complement}
+                  onChange={(e) => setComplement(e.target.value)}
+                  className="bg-secondary border-primary/30 text-foreground"
+                  data-testid="input-complement"
+                />
+
+                <Textarea
+                  placeholder="Observacoes para entrega (ex: portao azul, casa dos fundos...)"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="bg-secondary border-primary/30 text-foreground resize-none"
+                  rows={2}
+                  data-testid="input-notes"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-primary/50 text-primary"
+                  onClick={() => {
+                    setStep('phone');
+                    setPassword('');
+                  }}
+                  data-testid="button-back-register"
+                >
+                  Voltar
+                </Button>
+                <Button
+                  className="flex-1 bg-primary text-primary-foreground"
+                  onClick={handleRegister}
+                  disabled={isLoading}
+                  data-testid="button-register"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    'Criar Conta'
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
