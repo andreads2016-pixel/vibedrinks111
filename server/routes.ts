@@ -458,10 +458,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/products/:id", async (req, res) => {
-    const product = await storage.getProduct(req.params.id);
-    if (!product) return res.status(404).json({ error: "Product not found" });
-    res.json(product);
+  app.get("/api/products/trending", async (req, res) => {
+    const limit = parseInt(req.query.limit as string) || 10;
+    const trendingProducts = await storage.getTrendingProducts(limit);
+    res.json(trendingProducts);
   });
 
   app.get("/api/products/category/:categoryId", async (req, res) => {
@@ -469,10 +469,10 @@ export async function registerRoutes(
     res.json(products);
   });
 
-  app.get("/api/products/trending", async (req, res) => {
-    const limit = parseInt(req.query.limit as string) || 10;
-    const trendingProducts = await storage.getTrendingProducts(limit);
-    res.json(trendingProducts);
+  app.get("/api/products/:id", async (req, res) => {
+    const product = await storage.getProduct(req.params.id);
+    if (!product) return res.status(404).json({ error: "Product not found" });
+    res.json(product);
   });
 
   app.post("/api/products", async (req, res) => {

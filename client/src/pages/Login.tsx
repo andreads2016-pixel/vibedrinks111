@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useLocation } from 'wouter';
-import { Phone, User, MapPin, ArrowRight, Loader2, Lock } from 'lucide-react';
+import { useLocation, Link } from 'wouter';
+import { Phone, User, MapPin, ArrowRight, Loader2, Lock, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -209,22 +210,6 @@ export default function Login() {
     }
   };
 
-  const getStepTitle = () => {
-    switch (step) {
-      case 'phone': return 'Entrar';
-      case 'password': return `Ola, ${userName}!`;
-      case 'register': return 'Criar Conta';
-    }
-  };
-
-  const getStepDescription = () => {
-    switch (step) {
-      case 'phone': return 'Digite seu numero de WhatsApp para continuar';
-      case 'password': return 'Digite sua senha de 6 digitos';
-      case 'register': return 'Complete seu cadastro para fazer pedidos';
-    }
-  };
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -232,273 +217,361 @@ export default function Login() {
     }).format(price);
   };
 
+  const stepIndicators = [
+    { step: 'phone', label: 'Telefone' },
+    { step: 'password', label: 'Senha' },
+  ];
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-card border-primary/20">
-        <CardHeader className="text-center">
-          <img src={logoImage} alt="Vibe Drinks" className="h-16 mx-auto mb-4" />
-          <CardTitle className="font-serif text-2xl text-primary">
-            {getStepTitle()}
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            {getStepDescription()}
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className="space-y-4">
-          {step === 'phone' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp" className="text-foreground">WhatsApp</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="whatsapp"
-                    type="tel"
-                    placeholder="(11) 9 1234-5678"
-                    value={whatsapp}
-                    onChange={handlePhoneChange}
-                    className="pl-10 bg-secondary border-primary/30 text-foreground"
-                    data-testid="input-whatsapp"
-                  />
-                </div>
-              </div>
-
-              <Button
-                className="w-full bg-primary text-primary-foreground"
-                onClick={handleCheckPhone}
-                disabled={isLoading}
-                data-testid="button-continue"
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-black/50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-gradient-radial-gold opacity-20 pointer-events-none" />
+      
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md relative z-10"
+      >
+        <Card className="bg-card/80 backdrop-blur-xl border-primary/20 shadow-2xl shadow-primary/5">
+          <CardHeader className="text-center pb-2">
+            <Link href="/">
+              <img 
+                src={logoImage} 
+                alt="Vibe Drinks" 
+                className="h-14 mx-auto mb-4 hover:opacity-80 transition-opacity"
+              />
+            </Link>
+            
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={step}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
               >
-                {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <>
-                    Continuar
-                    <ArrowRight className="h-5 w-5 ml-2" />
-                  </>
-                )}
-              </Button>
+                <CardTitle className="font-serif text-2xl bg-gradient-to-r from-primary via-amber-400 to-primary bg-clip-text text-transparent">
+                  {step === 'phone' && 'Entrar'}
+                  {step === 'password' && `Ola, ${userName}!`}
+                  {step === 'register' && 'Criar Conta'}
+                </CardTitle>
+                <CardDescription className="text-muted-foreground mt-2">
+                  {step === 'phone' && 'Digite seu numero de WhatsApp para continuar'}
+                  {step === 'password' && 'Digite sua senha de 6 digitos'}
+                  {step === 'register' && 'Complete seu cadastro para fazer pedidos'}
+                </CardDescription>
+              </motion.div>
+            </AnimatePresence>
 
-              <Button
-                variant="ghost"
-                className="w-full text-muted-foreground"
-                onClick={() => setLocation('/')}
-                data-testid="button-back-home"
-              >
-                Voltar para o site
-              </Button>
-            </>
-          )}
-
-          {step === 'password' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-foreground">Senha (6 digitos)</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    inputMode="numeric"
-                    placeholder="000000"
-                    value={password}
-                    onChange={handlePasswordChange}
-                    maxLength={6}
-                    className="pl-10 bg-secondary border-primary/30 text-foreground text-center text-xl tracking-widest"
-                    data-testid="input-password"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 border-primary/50 text-primary"
-                  onClick={() => {
-                    setStep('phone');
-                    setPassword('');
-                  }}
-                  data-testid="button-back-password"
-                >
-                  Voltar
-                </Button>
-                <Button
-                  className="flex-1 bg-primary text-primary-foreground"
-                  onClick={handleLogin}
-                  disabled={isLoading || password.length !== 6}
-                  data-testid="button-login"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    'Entrar'
-                  )}
-                </Button>
-              </div>
-
-              <Button
-                variant="ghost"
-                className="w-full text-muted-foreground text-sm"
-                onClick={() => {
-                  toast({ 
-                    title: 'Recuperar Senha', 
-                    description: 'Entre em contato com a loja via WhatsApp para solicitar uma nova senha.'
-                  });
-                }}
-                data-testid="button-forgot-password"
-              >
-                Esqueci minha senha
-              </Button>
-            </>
-          )}
-
-          {step === 'register' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-foreground">Nome completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    placeholder="Seu nome"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="pl-10 bg-secondary border-primary/30 text-foreground"
-                    data-testid="input-name"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="register-password" className="text-foreground">Crie uma senha (6 digitos)</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="register-password"
-                    type="password"
-                    inputMode="numeric"
-                    placeholder="000000"
-                    value={password}
-                    onChange={handlePasswordChange}
-                    maxLength={6}
-                    className="pl-10 bg-secondary border-primary/30 text-foreground text-center text-xl tracking-widest"
-                    data-testid="input-register-password"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">Apenas numeros, 6 digitos</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-foreground flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Endereco de entrega
-                </Label>
-                
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Bairro (Grande Sao Paulo)</Label>
-                  <Select
-                    value={selectedNeighborhood}
-                    onValueChange={setSelectedNeighborhood}
-                  >
-                    <SelectTrigger 
-                      className="bg-secondary border-primary/30"
-                      data-testid="select-neighborhood-register"
+            {step !== 'register' && (
+              <div className="flex items-center justify-center gap-2 mt-4">
+                {stepIndicators.map((indicator, index) => (
+                  <div key={indicator.step} className="flex items-center">
+                    <div 
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
+                        step === indicator.step 
+                          ? 'bg-primary text-primary-foreground' 
+                          : step === 'password' && indicator.step === 'phone'
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                            : 'bg-secondary text-muted-foreground'
+                      }`}
                     >
-                      <SelectValue placeholder="Selecione seu bairro" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {groupedNeighborhoods.map(({ zone, zoneInfo, neighborhoods }) => (
-                        <div key={zone}>
-                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-secondary/50">
-                            {zoneInfo.name} - {formatPrice(zoneInfo.fee)}
-                          </div>
-                          {neighborhoods.map((n) => (
-                            <SelectItem 
-                              key={n.name} 
-                              value={n.name}
-                              data-testid={`option-neighborhood-${n.name}`}
-                            >
-                              {n.name}
-                            </SelectItem>
+                      {step === 'password' && indicator.step === 'phone' ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : (
+                        index + 1
+                      )}
+                    </div>
+                    {index < stepIndicators.length - 1 && (
+                      <div className={`w-12 h-0.5 mx-1 ${
+                        step === 'password' ? 'bg-primary' : 'bg-secondary'
+                      }`} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardHeader>
+          
+          <CardContent className="space-y-4 pt-4">
+            <AnimatePresence mode="wait">
+              {step === 'phone' && (
+                <motion.div
+                  key="phone"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsapp" className="text-foreground">WhatsApp</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/60" />
+                      <Input
+                        id="whatsapp"
+                        type="tel"
+                        placeholder="(11) 9 1234-5678"
+                        value={whatsapp}
+                        onChange={handlePhoneChange}
+                        className="pl-11 bg-secondary/50 border-primary/20 text-foreground focus:border-primary h-12 text-lg"
+                        data-testid="input-whatsapp"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    className="w-full h-12 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold text-lg"
+                    onClick={handleCheckPhone}
+                    disabled={isLoading}
+                    data-testid="button-continue"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        Continuar
+                        <ArrowRight className="h-5 w-5 ml-2" />
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    className="w-full text-muted-foreground hover:text-primary"
+                    onClick={() => setLocation('/')}
+                    data-testid="button-back-home"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Voltar para o site
+                  </Button>
+                </motion.div>
+              )}
+
+              {step === 'password' && (
+                <motion.div
+                  key="password"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-foreground">Senha (6 digitos)</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/60" />
+                      <Input
+                        id="password"
+                        type="password"
+                        inputMode="numeric"
+                        placeholder="******"
+                        value={password}
+                        onChange={handlePasswordChange}
+                        maxLength={6}
+                        className="pl-11 bg-secondary/50 border-primary/20 text-foreground text-center text-2xl tracking-[0.5em] h-12 font-mono"
+                        data-testid="input-password"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1 h-12 border-primary/30 text-primary hover:bg-primary/10"
+                      onClick={() => {
+                        setStep('phone');
+                        setPassword('');
+                      }}
+                      data-testid="button-back-password"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Voltar
+                    </Button>
+                    <Button
+                      className="flex-1 h-12 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold"
+                      onClick={handleLogin}
+                      disabled={isLoading || password.length !== 6}
+                      data-testid="button-login"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        'Entrar'
+                      )}
+                    </Button>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    className="w-full text-muted-foreground text-sm hover:text-primary"
+                    onClick={() => {
+                      toast({ 
+                        title: 'Recuperar Senha', 
+                        description: 'Entre em contato com a loja via WhatsApp para solicitar uma nova senha.'
+                      });
+                    }}
+                    data-testid="button-forgot-password"
+                  >
+                    Esqueci minha senha
+                  </Button>
+                </motion.div>
+              )}
+
+              {step === 'register' && (
+                <motion.div
+                  key="register"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-foreground">Nome completo</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/60" />
+                      <Input
+                        id="name"
+                        placeholder="Seu nome"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="pl-11 bg-secondary/50 border-primary/20 text-foreground h-11"
+                        data-testid="input-name"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password" className="text-foreground">Crie uma senha (6 digitos)</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/60" />
+                      <Input
+                        id="register-password"
+                        type="password"
+                        inputMode="numeric"
+                        placeholder="******"
+                        value={password}
+                        onChange={handlePasswordChange}
+                        maxLength={6}
+                        className="pl-11 bg-secondary/50 border-primary/20 text-foreground text-center text-xl tracking-[0.5em] h-11 font-mono"
+                        data-testid="input-register-password"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Apenas numeros, 6 digitos</p>
+                  </div>
+
+                  <div className="space-y-3 p-4 rounded-xl bg-secondary/30 border border-primary/10">
+                    <Label className="text-foreground flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      Endereco de entrega
+                    </Label>
+                    
+                    <div className="space-y-3">
+                      <Select
+                        value={selectedNeighborhood}
+                        onValueChange={setSelectedNeighborhood}
+                      >
+                        <SelectTrigger 
+                          className="bg-secondary/50 border-primary/20 h-11"
+                          data-testid="select-neighborhood-register"
+                        >
+                          <SelectValue placeholder="Selecione seu bairro" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groupedNeighborhoods.map(({ zone, zoneInfo, neighborhoods }) => (
+                            <div key={zone}>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-secondary/50 sticky top-0">
+                                {zoneInfo.name} - {formatPrice(zoneInfo.fee)}
+                              </div>
+                              {neighborhoods.map((n) => (
+                                <SelectItem 
+                                  key={n.name} 
+                                  value={n.name}
+                                  data-testid={`option-neighborhood-${n.name}`}
+                                >
+                                  {n.name}
+                                </SelectItem>
+                              ))}
+                            </div>
                           ))}
-                        </div>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedNeighborhoodFee !== null && (
-                    <p className="text-sm text-primary">
-                      Taxa de entrega: {formatPrice(selectedNeighborhoodFee)}
-                    </p>
-                  )}
-                </div>
-                
-                <p className="text-xs text-muted-foreground">{DELIVERY_FEE_WARNING}</p>
+                        </SelectContent>
+                      </Select>
+                      
+                      {selectedNeighborhoodFee !== null && (
+                        <p className="text-sm text-primary flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Taxa de entrega: {formatPrice(selectedNeighborhoodFee)}
+                        </p>
+                      )}
 
-                <div className="grid grid-cols-4 gap-2">
-                  <Input
-                    placeholder="Rua"
-                    value={street}
-                    onChange={(e) => setStreet(e.target.value)}
-                    className="col-span-3 bg-secondary border-primary/30 text-foreground"
-                    data-testid="input-street"
-                  />
-                  <Input
-                    placeholder="Nro"
-                    value={number}
-                    onChange={(e) => setNumber(e.target.value)}
-                    className="bg-secondary border-primary/30 text-foreground"
-                    data-testid="input-number"
-                  />
-                </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        <Input
+                          placeholder="Rua"
+                          value={street}
+                          onChange={(e) => setStreet(e.target.value)}
+                          className="col-span-3 bg-secondary/50 border-primary/20 text-foreground h-10"
+                          data-testid="input-street"
+                        />
+                        <Input
+                          placeholder="Nro"
+                          value={number}
+                          onChange={(e) => setNumber(e.target.value)}
+                          className="bg-secondary/50 border-primary/20 text-foreground h-10"
+                          data-testid="input-number"
+                        />
+                      </div>
 
-                <Input
-                  placeholder="Complemento (opcional)"
-                  value={complement}
-                  onChange={(e) => setComplement(e.target.value)}
-                  className="bg-secondary border-primary/30 text-foreground"
-                  data-testid="input-complement"
-                />
+                      <Input
+                        placeholder="Complemento (opcional)"
+                        value={complement}
+                        onChange={(e) => setComplement(e.target.value)}
+                        className="bg-secondary/50 border-primary/20 text-foreground h-10"
+                        data-testid="input-complement"
+                      />
 
-                <Textarea
-                  placeholder="Observacoes para entrega (ex: portao azul, casa dos fundos...)"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="bg-secondary border-primary/30 text-foreground resize-none"
-                  rows={2}
-                  data-testid="input-notes"
-                />
-              </div>
+                      <Textarea
+                        placeholder="Observacoes para entrega..."
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        className="bg-secondary/50 border-primary/20 text-foreground resize-none"
+                        rows={2}
+                        data-testid="input-notes"
+                      />
+                      
+                      <p className="text-xs text-muted-foreground">{DELIVERY_FEE_WARNING}</p>
+                    </div>
+                  </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 border-primary/50 text-primary"
-                  onClick={() => {
-                    setStep('phone');
-                    setPassword('');
-                  }}
-                  data-testid="button-back-register"
-                >
-                  Voltar
-                </Button>
-                <Button
-                  className="flex-1 bg-primary text-primary-foreground"
-                  onClick={handleRegister}
-                  disabled={isLoading}
-                  data-testid="button-register"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    'Criar Conta'
-                  )}
-                </Button>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 h-11 border-primary/30 text-primary hover:bg-primary/10"
+                      onClick={() => {
+                        setStep('phone');
+                        setPassword('');
+                      }}
+                      data-testid="button-back-register"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Voltar
+                    </Button>
+                    <Button
+                      className="flex-1 h-11 bg-gradient-to-r from-amber-500 to-yellow-500 text-black font-semibold"
+                      onClick={handleRegister}
+                      disabled={isLoading}
+                      data-testid="button-register"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        'Criar Conta'
+                      )}
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }
